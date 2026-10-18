@@ -1,4 +1,14 @@
+# Сборочные папки и кэш
 venv/
+build/
+dist/
+*.spec
 __pycache__/
 *.pyc
-.vscode/
+
+# Старые версии файлов и бэкапы
+old/
+main(backup).py
+main2.py
+main3.py
+test.py

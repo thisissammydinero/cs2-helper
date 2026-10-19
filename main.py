@@ -525,12 +525,12 @@ class CS2HelperApp(ctk.CTk):
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.resizable(False, False)
 
-        # Стабильная загрузка иконки
+        # Стабильная загрузка иконки для окна и панели задач
         try:
             base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
             icon_path = os.path.join(base_path, "icon.ico")
             if os.path.exists(icon_path):
-                self.iconbitmap(icon_path)
+                self.after(200, lambda: self.iconbitmap(icon_path))
         except Exception:
             pass
 

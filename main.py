@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import winreg
 import zipfile
@@ -12,7 +13,27 @@ from tkinter import messagebox, filedialog
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
-# --- Идеально стабильный класс тултипов на таймерах ---
+# --- Фоновый холст с сеткой ---
+class GridBackgroundCanvas(tk.Canvas):
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.configure(bg="#121212", highlightthickness=0)
+        self.bind("<Configure>", self.draw_grid)
+
+    def draw_grid(self, event=None):
+        self.delete("grid_line")
+        width = self.winfo_width()
+        height = self.winfo_height()
+        
+        spacing = 30
+        
+        for x in range(0, width, spacing):
+            self.create_line(x, 0, x, height, fill="#1a1a1a", tags="grid_line")
+        
+        for y in range(0, height, spacing):
+            self.create_line(0, y, width, y, fill="#1a1a1a", tags="grid_line")
+
+# --- Стабильный класс тултипов на таймерах ---
 class ToolTip:
     def __init__(self, widget, text):
         self.widget = widget
@@ -74,7 +95,7 @@ class ToolTip:
                 pass
             self.tip_window = None
 
-# --- Работа с реестром для имен аккаунтов ---
+# --- Работа с реестром для кастомных имен аккаунтов ---
 def get_saved_account_names():
     names = {}
     try:
@@ -108,7 +129,7 @@ def delete_account_name_from_registry(acc_id):
     except Exception:
         pass
 
-# Словарь локализации
+# Словарь локализации (RU / EN)
 LANGUAGES = {
     "en": {
         "title": "CS2 Helper",
@@ -142,11 +163,20 @@ LANGUAGES = {
             "• Change Account: Switches active Steam account for config operations.\n\n"
             "• Save & Load Config: Archives or restores the 'remote' folder containing in-game settings (.zip).\n\n"
             "• Account Custom Names: Click the pencil icon to edit, floppy disk to save, or reset button to restore default Steam ID.\n\n"
-            "• Open CFG Folder: Opens the official game configuration directory.\n\n"
+            "• Open CFG Folder: Opens the 'remote' configuration directory for active account.\n\n"
             "• Open Userdata Folder: Opens the root Steam userdata directory.\n\n"
             "• Demo Manager: Lists all .dem files, shows their size, lets you delete or open folder.\n\n"
             "• Clear Game Cache: Clears Workshop maps and shader cache, calculates and shows freed space."
         ),
+        "id_help_title": "How to find your Steam32 ID",
+        "id_help_text": (
+            "The ID displayed in CS2 Helper is your Steam32 ID (folder name in userdata).\n\n"
+            "Ways to find it:\n"
+            "1. Open Steam Trade URL page. The numbers after 'partner=' in your trade link is your Steam32 ID.\n\n"
+            "2. Open your Steam Profile link and enter it on sites like steamid.finder or steamid.io.\n\n"
+            "3. Look at the folder names inside 'C:\\Program Files (x86)\\Steam\\userdata\\'."
+        ),
+        "btn_open_trade_url": "🌐 Open Trade URL Page",
         "tip_edit": "Focus/Edit account name",
         "tip_save": "Save custom account name",
         "tip_reset": "Reset to default Steam ID",
@@ -184,11 +214,20 @@ LANGUAGES = {
             "• Сменить аккаунт: Переключает активный аккаунт Steam для работы с конфигами.\n\n"
             "• Сохранить и Загрузить конфиг: Архивирует или восстанавливает папку 'remote' с настройками из .zip архива.\n\n"
             "• Имена аккаунтов: Нажмите на карандаш для редактирования, дискету для сохранения или сброс для возврата к Steam ID.\n\n"
-            "• Открыть папку CFG: Открывает стандартную директорию конфигурации игры.\n\n"
+            "• Открыть папку CFG: Открывает папку конфигурации 'remote' активного аккаунта.\n\n"
             "• Открыть папку userdata: Открывает корневую папку userdata всех аккаунтов Steam.\n\n"
             "• Управление демками: Показывает список .dem файлов, размер, позволяет удалять или открывать папку.\n\n"
             "• Очистить кэш игры: Удаляет карты из Мастерской и кэш шейдеров, подсчитывая освобожденное место."
         ),
+        "id_help_title": "Как узнать свой Steam32 ID",
+        "id_help_text": (
+            "ID, который отображается в CS2 Helper — это ваш Steam32 ID (название папки в userdata).\n\n"
+            "Способы его узнать:\n"
+            "1. Откройте страницу трейд-ссылки Steam. Цифры после 'partner=' в вашей ссылке — это и есть Steam32 ID.\n\n"
+            "2. Вставьте ссылку на ваш профиль Steam в сервисы вроде steamid.finder или steamid.io.\n\n"
+            "3. Посмотрите названия папок внутри 'C:\\Program Files (x86)\\Steam\\userdata\\'."
+        ),
+        "btn_open_trade_url": "🌐 Открыть страницу трейд-ссылки",
         "tip_edit": "Фокус/Редактировать имя",
         "tip_save": "Сохранить имя",
         "tip_reset": "Сбросить к Steam ID",
@@ -215,6 +254,40 @@ def get_steam_accounts(steam_path):
             if os.path.isdir(folder_path) and folder_name.isdigit() and folder_name != "0":
                 accounts.append(folder_name)
     return accounts
+
+class SteamIDHelpWindow(ctk.CTkToplevel):
+    def __init__(self, parent, lang):
+        super().__init__(parent)
+        self.title(LANGUAGES[lang]["id_help_title"])
+        
+        window_width = 480
+        window_height = 360
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (window_width // 2)
+        y = (screen_height // 2) - (window_height // 2)
+        
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.resizable(False, False)
+        self.attributes("-toolwindow", True)
+        self.grab_set()
+
+        lbl_title = ctk.CTkLabel(self, text=LANGUAGES[lang]["id_help_title"], font=("Segoe UI", 16, "bold"))
+        lbl_title.pack(pady=12)
+
+        txt_box = ctk.CTkTextbox(self, width=440, height=220, font=("Segoe UI", 12), fg_color="#222222", corner_radius=8, wrap="word")
+        txt_box.pack(pady=5, padx=15)
+        txt_box.insert("1.0", LANGUAGES[lang]["id_help_text"])
+        txt_box.configure(state="disabled")
+
+        btn_open_web = ctk.CTkButton(
+            self, 
+            text=LANGUAGES[lang]["btn_open_trade_url"], 
+            font=("Segoe UI", 12, "bold"),
+            fg_color="#1f538d", hover_color="#14375e",
+            command=lambda: webbrowser.open("https://steamcommunity.com/my/tradeoffers/privacy")
+        )
+        btn_open_web.pack(pady=12)
 
 class FAQWindow(ctk.CTkToplevel):
     def __init__(self, parent, lang):
@@ -436,6 +509,9 @@ class CS2HelperApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
+        # Единый цвет фона окна для предотвращения полос
+        self.configure(fg_color="#121212")
+
         self.lang = "en"
 
         window_width = 460
@@ -449,10 +525,18 @@ class CS2HelperApp(ctk.CTk):
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.resizable(False, False)
 
+        # Стабильная загрузка иконки
         try:
-            self.iconbitmap("icon.ico")
+            base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+            icon_path = os.path.join(base_path, "icon.ico")
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
         except Exception:
             pass
+
+        # --- Фоновый холст с сеткой ---
+        self.bg_canvas = GridBackgroundCanvas(self)
+        self.bg_canvas.place(x=0, y=0, relwidth=1, relheight=1)
 
         self.steam_path = get_steam_path()
         self.current_account = None
@@ -466,40 +550,39 @@ class CS2HelperApp(ctk.CTk):
         if self.accounts:
             self.current_account = self.accounts[0]
 
-        # --- Верхняя панель ---
-        self.top_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.top_frame.pack(fill="x", padx=20, pady=(12, 0))
+        # --- Шапка приложения как единая стильная карточка ---
+        self.header_card = ctk.CTkFrame(self, fg_color="#1a1a1a", corner_radius=10, border_width=1, border_color="#2a2a2a")
+        self.header_card.pack(pady=(12, 6), padx=20, fill="x")
 
         self.btn_faq = ctk.CTkButton(
-            self.top_frame, text=LANGUAGES[self.lang]["faq_btn"], font=("Segoe UI", 12, "bold"),
-            width=38, height=28, fg_color="#333333", hover_color="#444444",
+            self.header_card, text=LANGUAGES[self.lang]["faq_btn"], font=("Segoe UI", 12, "bold"),
+            width=36, height=26, fg_color="#2a2a2a", hover_color="#3a3a3a",
             command=self.open_faq_window
         )
-        self.btn_faq.pack(side="left")
+        self.btn_faq.place(x=10, y=10)
 
         self.btn_lang = ctk.CTkButton(
-            self.top_frame, text=LANGUAGES[self.lang]["lang_btn"], font=("Segoe UI", 12, "bold"),
-            width=65, height=28, fg_color="#333333", hover_color="#444444",
+            self.header_card, text=LANGUAGES[self.lang]["lang_btn"], font=("Segoe UI", 12, "bold"),
+            width=60, height=26, fg_color="#2a2a2a", hover_color="#3a3a3a",
             command=self.toggle_language
         )
-        self.btn_lang.pack(side="right")
+        self.btn_lang.place(x=348, y=10)
 
-        # --- Шапка приложения ---
-        self.label_title = ctk.CTkLabel(self, text="CS2 Helper V.1", font=("Segoe UI", 20, "bold"))
-        self.label_title.pack(pady=(6, 4))
+        self.label_title = ctk.CTkLabel(self.header_card, text="CS2 Helper V.1", font=("Segoe UI", 18, "bold"), fg_color="transparent")
+        self.label_title.pack(pady=(12, 2))
 
         saved_names = get_saved_account_names()
         display_acc_name = saved_names.get(self.current_account, self.current_account)
 
-        self.lbl_acc_info = ctk.CTkLabel(self, text=f"{LANGUAGES[self.lang]['active_acc']}{display_acc_name}", font=("Segoe UI", 12), text_color="cyan")
+        self.lbl_acc_info = ctk.CTkLabel(self.header_card, text=f"{LANGUAGES[self.lang]['active_acc']}{display_acc_name}", font=("Segoe UI", 12), text_color="cyan", fg_color="transparent")
         self.lbl_acc_info.pack(pady=(0, 2))
 
         self.lbl_link = ctk.CTkLabel(
-            self, text=LANGUAGES[self.lang]["find_id"], font=("Segoe UI", 11, "underline"), 
-            text_color="#3399ff", cursor="hand2"
+            self.header_card, text=LANGUAGES[self.lang]["find_id"], font=("Segoe UI", 11, "underline"), 
+            text_color="#3399ff", cursor="hand2", fg_color="transparent"
         )
-        self.lbl_link.pack(pady=(0, 12))
-        self.lbl_link.bind("<Button-1>", lambda e: webbrowser.open("https://steamcommunity.com/my/tradeoffers/privacy"))
+        self.lbl_link.pack(pady=(0, 10))
+        self.lbl_link.bind("<Button-1>", lambda e: self.open_id_help_window())
 
         # ==========================================
         # КАТЕГОРИЯ 1: Аккаунт и Конфиг
@@ -509,7 +592,7 @@ class CS2HelperApp(ctk.CTk):
         self.frame_acc.grid_columnconfigure(0, weight=1)
         self.frame_acc.grid_columnconfigure(1, weight=1)
 
-        self.lbl_sec1 = ctk.CTkLabel(self.frame_acc, text=LANGUAGES[self.lang]["sec_acc"], font=("Segoe UI", 12, "bold"), text_color="gray")
+        self.lbl_sec1 = ctk.CTkLabel(self.frame_acc, text=LANGUAGES[self.lang]["sec_acc"], font=("Segoe UI", 12, "bold"), text_color="gray", fg_color="#1a1a1a")
         self.lbl_sec1.grid(row=0, column=0, columnspan=2, sticky="w", padx=14, pady=(10, 4))
 
         self.btn_change_acc = ctk.CTkButton(
@@ -539,7 +622,7 @@ class CS2HelperApp(ctk.CTk):
         self.frame_files = ctk.CTkFrame(self, fg_color="#1a1a1a", corner_radius=10, border_width=1, border_color="#2a2a2a")
         self.frame_files.pack(pady=6, padx=20, fill="x")
 
-        self.lbl_sec2 = ctk.CTkLabel(self.frame_files, text=LANGUAGES[self.lang]["sec_files"], font=("Segoe UI", 12, "bold"), text_color="gray")
+        self.lbl_sec2 = ctk.CTkLabel(self.frame_files, text=LANGUAGES[self.lang]["sec_files"], font=("Segoe UI", 12, "bold"), text_color="gray", fg_color="#1a1a1a")
         self.lbl_sec2.pack(anchor="w", padx=14, pady=(10, 4))
 
         self.btn_open_cfg = ctk.CTkButton(self.frame_files, text=LANGUAGES[self.lang]["btn_cfg"], font=("Segoe UI", 12), command=self.open_cfg_folder, width=380, height=34, fg_color="#333333", hover_color="#444444")
@@ -561,7 +644,7 @@ class CS2HelperApp(ctk.CTk):
         self.frame_service = ctk.CTkFrame(self, fg_color="#1a1a1a", corner_radius=10, border_width=1, border_color="#2a2a2a")
         self.frame_service.pack(pady=6, padx=20, fill="x")
 
-        self.lbl_sec3 = ctk.CTkLabel(self.frame_service, text=LANGUAGES[self.lang]["sec_service"], font=("Segoe UI", 12, "bold"), text_color="gray")
+        self.lbl_sec3 = ctk.CTkLabel(self.frame_service, text=LANGUAGES[self.lang]["sec_service"], font=("Segoe UI", 12, "bold"), text_color="gray", fg_color="#1a1a1a")
         self.lbl_sec3.pack(anchor="w", padx=14, pady=(10, 4))
 
         self.btn_clear_cache = ctk.CTkButton(self.frame_service, text=LANGUAGES[self.lang]["btn_cache"], font=("Segoe UI", 12), command=self.clear_game_cache, width=380, height=34, fg_color="#4d2222", hover_color="#662e2e")
@@ -575,6 +658,9 @@ class CS2HelperApp(ctk.CTk):
 
     def open_faq_window(self):
         FAQWindow(self, self.lang)
+
+    def open_id_help_window(self):
+        SteamIDHelpWindow(self, self.lang)
 
     def update_ui_texts(self):
         t = LANGUAGES[self.lang]
@@ -615,20 +701,35 @@ class CS2HelperApp(ctk.CTk):
             display_acc_name = saved_names.get(self.current_account, self.current_account)
             self.lbl_acc_info.configure(text=f"{LANGUAGES[self.lang]['active_acc']}{display_acc_name}")
 
-    def get_current_cfg_path(self):
-        if self.current_account:
-            userdata_cfg = os.path.join(self.steam_path, "userdata", self.current_account, "730", "remote")
-            if os.path.exists(userdata_cfg):
-                return userdata_cfg
-                
-        return os.path.join(self.steam_path, "steamapps", "common", "Counter-Strike Global Offensive", "game", "csgo")
+    def get_current_remote_path(self):
+        """Возвращает путь к папке remote текущего аккаунта Steam"""
+        if self.current_account and self.steam_path:
+            return os.path.join(self.steam_path, "userdata", self.current_account, "730", "remote")
+        return None
+
+    def open_cfg_folder(self):
+        """Открывает папку remote активного аккаунта или общую папку игры как fallback"""
+        remote_path = self.get_current_remote_path()
+        
+        if remote_path and os.path.exists(remote_path):
+            os.startfile(remote_path)
+        else:
+            fallback_path = os.path.join(self.steam_path, "steamapps", "common", "Counter-Strike Global Offensive", "game", "csgo", "cfg")
+            if os.path.exists(fallback_path):
+                messagebox.showwarning(
+                    "Warning" if self.lang == "en" else "Внимание",
+                    "Account remote folder not found. Opening general game CFG folder instead." if self.lang == "en" else "Папка remote аккаунта не найдена. Открывается общая папка CFG игры."
+                )
+                os.startfile(fallback_path)
+            else:
+                messagebox.showerror("Error" if self.lang == "en" else "Ошибка", "Remote folder not found." if self.lang == "en" else "Папка remote не найдена.")
 
     def save_config(self):
+        """Архивирует всю папку remote текущего аккаунта"""
         try:
-            target_cfg_path = self.get_current_cfg_path()
-            remote_path = os.path.dirname(target_cfg_path) if target_cfg_path.endswith("cfg") else target_cfg_path
+            remote_path = self.get_current_remote_path()
             
-            if not os.path.exists(remote_path):
+            if not remote_path or not os.path.exists(remote_path):
                 messagebox.showerror("Error" if self.lang == "en" else "Ошибка", f"Remote folder not found:\n{remote_path}")
                 return
 
@@ -663,9 +764,12 @@ class CS2HelperApp(ctk.CTk):
             messagebox.showerror("Error" if self.lang == "en" else "Ошибка", f"Failed to create archive: {str(e)}")
 
     def restore_config(self):
+        """Восстанавливает файлы из архива прямо в папку remote текущего аккаунта"""
         try:
-            target_cfg_path = self.get_current_cfg_path()
-            remote_path = os.path.dirname(target_cfg_path) if target_cfg_path.endswith("cfg") else target_cfg_path
+            remote_path = self.get_current_remote_path()
+            if not remote_path:
+                messagebox.showerror("Error" if self.lang == "en" else "Ошибка", "Active account is not defined." if self.lang == "en" else "Активный аккаунт не определен.")
+                return
 
             default_dir = os.path.expanduser(r"~\Documents\CS2_Backups")
             if not os.path.exists(default_dir):
@@ -704,17 +808,6 @@ class CS2HelperApp(ctk.CTk):
                 messagebox.showerror("Error" if self.lang == "en" else "Ошибка", f"Userdata folder not found:\n{userdata_path}")
         else:
             messagebox.showerror("Error" if self.lang == "en" else "Ошибка", LANGUAGES[self.lang]["err_steam_path"])
-
-    def open_cfg_folder(self):
-        target_cfg_path = self.get_current_cfg_path()
-        if os.path.exists(target_cfg_path):
-            os.startfile(target_cfg_path)
-        else:
-            fallback_path = os.path.join(self.steam_path, "steamapps", "common", "Counter-Strike Global Offensive", "game", "csgo", "cfg")
-            if os.path.exists(fallback_path):
-                os.startfile(fallback_path)
-            else:
-                messagebox.showerror("Error" if self.lang == "en" else "Ошибка", "Config folder not found.")
 
     def clear_game_cache(self):
         if not self.steam_path:

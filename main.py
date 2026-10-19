@@ -145,6 +145,7 @@ LANGUAGES = {
         "btn_demos": "🎬 Demo Manager (.dem)",
         "sec_service": "Maintenance",
         "btn_cache": "🧹 Clear Game Cache",
+        "chk_workshop": "Include Workshop maps",
         "err_registry": "Failed to find installed Steam in registry!",
         "err_steam_path": "Steam path is not defined.",
         "err_no_acc": "No accounts found in userdata folder.",
@@ -153,7 +154,8 @@ LANGUAGES = {
         "restore_confirm_msg": "Are you sure you want to restore settings from archive?\nExisting files in active account 'remote' folder will be overwritten.",
         "restore_success": "Config successfully restored!",
         "cache_title": "Clear CS2 Cache",
-        "cache_msg": "This action will clear downloaded Steam Workshop maps and game shader cache (App ID 730).\n\nThis helps free up space and reduce stuttering.\n\nContinue?",
+        "cache_msg": "This action will clear game shader cache (App ID 730){workshop_text}.\n\nThis helps free up space and reduce stuttering.\n\nContinue?",
+        "workshop_included": " and Workshop maps",
         "cache_success": "CS2 cache and temp files successfully cleared!\n\nFreed space: ",
         "cache_empty": "CS2 temporary files not found (folders are already empty).",
         "lang_btn": "🌐 RU",
@@ -166,7 +168,7 @@ LANGUAGES = {
             "• Open CFG Folder: Opens the 'remote' configuration directory for active account.\n\n"
             "• Open Userdata Folder: Opens the root Steam userdata directory.\n\n"
             "• Demo Manager: Lists all .dem files, shows their size, lets you delete or open folder.\n\n"
-            "• Clear Game Cache: Clears Workshop maps and shader cache, calculates and shows freed space."
+            "• Clear Game Cache: Clears shader cache and optionally Workshop maps, calculates and shows freed space."
         ),
         "id_help_title": "How to find your Steam32 ID",
         "id_help_text": (
@@ -196,6 +198,7 @@ LANGUAGES = {
         "btn_demos": "🎬 Управление демками (.dem)",
         "sec_service": "Обслуживание",
         "btn_cache": "🧹 Очистить кэш игры",
+        "chk_workshop": "Включая карты из Мастерской",
         "err_registry": "Не удалось найти установленный Steam в реестре!",
         "err_steam_path": "Путь к Steam не определен.",
         "err_no_acc": "Аккаунты не найдены в папке userdata.",
@@ -204,7 +207,8 @@ LANGUAGES = {
         "restore_confirm_msg": "Вы уверены, что хотите восстановить настройки из архива?\nТекущие файлы в папке 'remote' активного аккаунта будут перезаписаны.",
         "restore_success": "Конфиг успешно восстановлен!",
         "cache_title": "Очистка кэша CS2",
-        "cache_msg": "Это действие очистит скачанные карты из Мастерской Steam и кэш шейдеров игры (App ID 730).\n\nЭто поможет освободить место и избавиться от возможных фризов.\n\nПродолжить?",
+        "cache_msg": "Это действие очистит кэш шейдеров игры (App ID 730){workshop_text}.\n\nЭто поможет освободить место и избавиться от возможных фризов.\n\nПродолжить?",
+        "workshop_included": " и карты из Мастерской",
         "cache_success": "Кэш и временные файлы CS2 успешно очищены!\n\nОсвобождено места: ",
         "cache_empty": "Временные файлы CS2 не найдены (папки уже пусты).",
         "lang_btn": "🌐 EN",
@@ -217,7 +221,7 @@ LANGUAGES = {
             "• Открыть папку CFG: Открывает папку конфигурации 'remote' активного аккаунта.\n\n"
             "• Открыть папку userdata: Открывает корневую папку userdata всех аккаунтов Steam.\n\n"
             "• Управление демками: Показывает список .dem файлов, размер, позволяет удалять или открывать папку.\n\n"
-            "• Очистить кэш игры: Удаляет карты из Мастерской и кэш шейдеров, подсчитывая освобожденное место."
+            "• Очистить кэш игры: Удаляет кэш шейдеров и опционально карты из Мастерской, подсчитывая освобожденное место."
         ),
         "id_help_title": "Как узнать свой Steam32 ID",
         "id_help_text": (
@@ -515,7 +519,7 @@ class CS2HelperApp(ctk.CTk):
         self.lang = "en"
 
         window_width = 460
-        window_height = 600
+        window_height = 635  # Чуть увеличили высоту под чекбокс
         
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -525,7 +529,7 @@ class CS2HelperApp(ctk.CTk):
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.resizable(False, False)
 
-        # Стабильная загрузка иконки для окна и панели задач
+        # Стабильная загрузка иконки с задержкой для Windows
         try:
             base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
             icon_path = os.path.join(base_path, "icon.ico")
@@ -645,10 +649,17 @@ class CS2HelperApp(ctk.CTk):
         self.frame_service.pack(pady=6, padx=20, fill="x")
 
         self.lbl_sec3 = ctk.CTkLabel(self.frame_service, text=LANGUAGES[self.lang]["sec_service"], font=("Segoe UI", 12, "bold"), text_color="gray", fg_color="#1a1a1a")
-        self.lbl_sec3.pack(anchor="w", padx=14, pady=(10, 4))
+        self.lbl_sec3.pack(anchor="w", padx=14, pady=(10, 2))
+
+        # Чекбокс для включения карт Мастерской (по умолчанию выключен)
+        self.chk_workshop = ctk.CTkCheckBox(
+            self.frame_service, text=LANGUAGES[self.lang]["chk_workshop"], 
+            font=("Segoe UI", 11), fg_color="#3f51b5", hover_color="#303f9f"
+        )
+        self.chk_workshop.pack(anchor="w", padx=16, pady=(2, 6))
 
         self.btn_clear_cache = ctk.CTkButton(self.frame_service, text=LANGUAGES[self.lang]["btn_cache"], font=("Segoe UI", 12), command=self.clear_game_cache, width=380, height=34, fg_color="#4d2222", hover_color="#662e2e")
-        self.btn_clear_cache.pack(padx=14, pady=(4, 12))
+        self.btn_clear_cache.pack(padx=14, pady=(2, 12))
 
         self.update_ui_texts()
 
@@ -685,6 +696,7 @@ class CS2HelperApp(ctk.CTk):
         self.btn_demos.configure(text=t["btn_demos"])
         
         self.lbl_sec3.configure(text=t["sec_service"])
+        self.chk_workshop.configure(text=t["chk_workshop"])
         self.btn_clear_cache.configure(text=t["btn_cache"])
 
     def open_account_window(self):
@@ -814,12 +826,16 @@ class CS2HelperApp(ctk.CTk):
             messagebox.showerror("Error" if self.lang == "en" else "Ошибка", LANGUAGES[self.lang]["err_steam_path"])
             return
 
-        workshop_path = os.path.join(self.steam_path, "steamapps", "workshop", "content", "730")
         shader_cache_path = os.path.join(self.steam_path, "steamapps", "shadercache", "730")
+        workshop_path = os.path.join(self.steam_path, "steamapps", "workshop", "content", "730")
+        
+        include_workshop = (self.chk_workshop.get() == 1)
 
         t = LANGUAGES[self.lang]
-        confirm = messagebox.askyesno(t["cache_title"], t["cache_msg"])
+        workshop_text = t["workshop_included"] if include_workshop else ""
+        msg = t["cache_msg"].format(workshop_text=workshop_text)
 
+        confirm = messagebox.askyesno(t["cache_title"], msg)
         if not confirm:
             return
 
@@ -837,22 +853,13 @@ class CS2HelperApp(ctk.CTk):
                             total += os.path.getsize(fp)
             return total
 
-        if os.path.exists(workshop_path):
-            total_size_bytes += get_size(workshop_path)
         if os.path.exists(shader_cache_path):
             total_size_bytes += get_size(shader_cache_path)
+        if include_workshop and os.path.exists(workshop_path):
+            total_size_bytes += get_size(workshop_path)
 
         deleted_something = False
         try:
-            if os.path.exists(workshop_path):
-                for item in os.listdir(workshop_path):
-                    item_path = os.path.join(workshop_path, item)
-                    if os.path.isdir(item_path):
-                        shutil.rmtree(item_path, ignore_errors=True)
-                    else:
-                        os.remove(item_path)
-                deleted_something = True
-
             if os.path.exists(shader_cache_path):
                 for item in os.listdir(shader_cache_path):
                     item_path = os.path.join(shader_cache_path, item)
@@ -862,7 +869,16 @@ class CS2HelperApp(ctk.CTk):
                         os.remove(item_path)
                 deleted_something = True
 
-            if deleted_something:
+            if include_workshop and os.path.exists(workshop_path):
+                for item in os.listdir(workshop_path):
+                    item_path = os.path.join(workshop_path, item)
+                    if os.path.isdir(item_path):
+                        shutil.rmtree(item_path, ignore_errors=True)
+                    else:
+                        os.remove(item_path)
+                deleted_something = True
+
+            if total_size_bytes > 0:
                 if total_size_bytes >= 1024 * 1024 * 1024:
                     size_str = f"{total_size_bytes / (1024 * 1024 * 1024):.2f} GB"
                 else:

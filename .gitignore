@@ -1,14 +1,16 @@
-# Сборочные папки и кэш
+# Виртуальное окружение
 venv/
+.venv/
+
+# Папки сборки PyInstaller
 build/
 dist/
 *.spec
+
+# Кеш Python
 __pycache__/
 *.pyc
 
-# Старые версии файлов и бэкапы
+# Временные папки
+cache_avatars/
 old/
-main(backup).py
-main2.py
-main3.py
-test.py
